@@ -312,12 +312,151 @@ python src/evaluate.py
 
 ---
 
+## Tecnicas Aplicadas (Fase 2)
+
+### 1. Role Prompting
+
+**O que e:** Definir uma persona especialista para o modelo, fornecendo contexto profissional e expertise.
+
+**Por que escolhi:** O prompt v1 usava uma persona generica ("Voce e um assistente"). Ao definir o modelo como um "Product Manager Senior com 10 anos de experiencia em metodologias ageis", as respostas passaram a ter tom profissional, vocabulario adequado e foco em valor de negocio — exatamente o que as metricas de Tone e Format exigiam.
+
+**Como apliquei:** No inicio do system_prompt, defini a persona completa:
+> "Voce e um Product Manager Senior com 10 anos de experiencia em metodologias ageis (Scrum/Kanban). Sua especialidade e transformar relatos tecnicos em User Stories centradas no usuario."
+
+### 2. Few-shot Learning
+
+**O que e:** Fornecer exemplos concretos de entrada/saida para o modelo aprender o padrao esperado.
+
+**Por que escolhi:** A metrica de Acceptance Criteria Score e User Story Format Score exigiam formato muito especifico (Given-When-Then, "Como um... eu quero... para que..."). Sem exemplos, o modelo produzia formatos inconsistentes. Com 3 exemplos cobrindo diferentes niveis de complexidade, o modelo passou a replicar o formato com alta fidelidade.
+
+**Como apliquei:** Inclui 3 exemplos completos no system_prompt:
+- **Exemplo 1 (Bug Simples):** Botao de login no mobile — demonstra user story basica com 5 criterios Given-When-Then
+- **Exemplo 2 (Bug Medio):** Campo de busca com acentos — demonstra user story com tratamento de normalizacao
+- **Exemplo 3 (Bug Complexo):** Sistema de pagamento com timeout — demonstra user story com secoes adicionais (Contexto Tecnico, Tasks Tecnicas Sugeridas)
+
+### 3. Chain of Thought (CoT)
+
+**O que e:** Instruir o modelo a seguir um raciocinio passo a passo antes de gerar a resposta final.
+
+**Por que escolhi:** A metrica de Completeness Score exigia que a user story cobrisse todos os aspectos do bug (usuario afetado, funcionalidade, valor, edge cases). Sem CoT, o modelo frequentemente omitia aspectos importantes. O raciocinio estruturado garantiu cobertura completa.
+
+**Como apliquei:** Defini 4 passos obrigatorios de analise antes da escrita:
+1. Identificar o usuario afetado
+2. Entender a acao/funcionalidade quebrada
+3. Determinar o valor de negocio
+4. Pensar em edge cases e criterios testaveis
+
+---
+
+## Resultados Finais
+
+### Prompt publicado no LangSmith Hub
+
+- **v1 (original):** [leonanluppi/bug_to_user_story_v1](https://smith.langchain.com/hub/leonanluppi/bug_to_user_story_v1)
+- **v2 (otimizado):** [primeiro/bug_to_user_story_v2](https://smith.langchain.com/hub/primeiro/bug_to_user_story_v2)
+
+### Resultados da Avaliacao (v2 otimizado)
+
+| Metrica | Score | Status |
+|---|---|---|
+| Tone Score | **0.98** | >=0.9 |
+| Acceptance Criteria Score | **0.98** | >=0.9 |
+| User Story Format Score | **0.98** | >=0.9 |
+| Completeness Score | **0.98** | >=0.9 |
+| **Media** | **0.98** | **>=0.9** |
+
+### Metricas adicionais
+
+| Metrica | Score |
+|---|---|
+| Helpfulness | 0.95 |
+| Clarity | 0.93 |
+| Precision | 0.98 |
+| F1-Score | 0.74 |
+| Correctness | 0.86 |
+
+### Tabela Comparativa: v1 vs v2
+
+| Aspecto | v1 (Original) | v2 (Otimizado) |
+|---|---|---|
+| Persona | Generica ("assistente") | Product Manager Senior especializado |
+| Formato | Sem formato definido | Template "Como um... eu quero... para que..." |
+| Exemplos | Nenhum | 3 exemplos (simples, medio, complexo) |
+| Criterios de Aceitacao | Nao mencionados | Given-When-Then obrigatorio |
+| Edge Cases | Nao tratados | 4 cenarios documentados |
+| Raciocinio | Nenhum | Chain of Thought em 4 passos |
+| Tamanho do system_prompt | ~200 caracteres | ~4900 caracteres |
+
+---
+
+## Como Executar
+
+### Pre-requisitos
+
+- Python 3.9+
+- Conta no [LangSmith](https://smith.langchain.com) com API Key
+- API Key do [Google Gemini](https://aistudio.google.com/app/apikey) (gratuito) ou [OpenAI](https://platform.openai.com/api-keys) (pago)
+
+### 1. Setup do ambiente
+
+```bash
+# Clonar o repositorio
+git clone https://github.com/seu-usuario/mba-ia-pull-evaluation-prompt.git
+cd mba-ia-pull-evaluation-prompt
+
+# Criar e ativar virtualenv
+python3 -m venv venv
+source venv/bin/activate  # No Windows: venv\Scripts\activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+```
+
+### 2. Configurar variaveis de ambiente
+
+```bash
+cp .env.example .env
+```
+
+Preencher no `.env`:
+- `LANGSMITH_API_KEY` - Sua chave do LangSmith
+- `USERNAME_LANGSMITH_HUB` - Seu handle publico do LangSmith Hub
+- `GOOGLE_API_KEY` ou `OPENAI_API_KEY` - Chave do provider LLM
+- `LLM_PROVIDER` - `google` ou `openai`
+- `LLM_MODEL` / `EVAL_MODEL` - Modelos a utilizar
+
+### 3. Pull do prompt original
+
+```bash
+python src/pull_prompts.py
+```
+
+### 4. Push do prompt otimizado
+
+```bash
+python src/push_prompts.py
+```
+
+### 5. Executar avaliacao
+
+```bash
+python src/evaluate.py
+```
+
+### 6. Executar testes
+
+```bash
+pytest tests/test_prompts.py -v
+```
+
+---
+
 ## Dicas Finais
 
-- **Lembre-se da importância da especificidade, contexto e persona** ao refatorar prompts
+- **Lembre-se da importancia da especificidade, contexto e persona** ao refatorar prompts
 - **Use Few-shot Learning com 2-3 exemplos claros** para melhorar drasticamente a performance
-- **Chain of Thought (CoT)** é excelente para tarefas que exigem raciocínio complexo (como análise de PRs)
-- **Use o Tracing do LangSmith** como sua principal ferramenta de debug - ele mostra exatamente o que o LLM está "pensando"
-- **Não altere os datasets de avaliação** - apenas os prompts em `prompts/bug_to_user_story_v2.yml`
-- **Itere, itere, itere** - é normal precisar de 3-5 iterações para atingir 0.9 em todas as métricas
-- **Documente seu processo** - a jornada de otimização é tão importante quanto o resultado final
+- **Chain of Thought (CoT)** e excelente para tarefas que exigem raciocinio complexo
+- **Use o Tracing do LangSmith** como sua principal ferramenta de debug
+- **Nao altere os datasets de avaliacao** - apenas os prompts em `prompts/bug_to_user_story_v2.yml`
+- **Itere, itere, itere** - e normal precisar de 3-5 iteracoes para atingir 0.9 em todas as metricas
+- **Documente seu processo** - a jornada de otimizacao e tao importante quanto o resultado final
